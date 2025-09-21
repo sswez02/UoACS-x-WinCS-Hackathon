@@ -98,7 +98,6 @@ function ensureMinimumPlan(plan, input = {}) {
   if (!Array.isArray(plan.citations)) {
     plan.citations = [{ title: "Seed evidence (volume-equated split vs full-body ~ similar outcomes)", year: 2022 }];
   }
-
   return plan;
 }
 
@@ -159,10 +158,9 @@ router.post("/generate/test", async (req, res) => {
 router.post("/generate", async (req, res) => {
   try {
     const input = req.body || {};
-    let plan = await synthesizePlan(input);
 
-    // NEW: backfill with defaults if model is sparse
-    plan = ensureMinimumPlan(plan, input);
+    // Directly build the plan (no AI call)
+    let plan = ensureMinimumPlan({}, input);
 
     const outDir = path.join(__dirname, "../../public");
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
@@ -174,12 +172,20 @@ router.post("/generate", async (req, res) => {
     await writeXlsx(plan, path.join(outDir, xlsx));
     await writeCsv(plan,  path.join(outDir, csv));
 
-    res.json({ xlsx: `/files/${xlsx}`, csv: `/files/${csv}` });
-  } catch (e) {
-    console.error("GENERATION FAILED:", e);
-    res.status(500).json({ error: "Generation failed" });
+    // Respond immediately with file links
+    res.json({
+      ok: true,
+      xlsx: `/files/${xlsx}`,
+      csv: `/files/${csv}`,
+      profile: plan.profile,
+      targets: plan.targets
+    });
+  } catch (err) {
+    console.error("MVP export failed:", err);
+    res.status(500).json({ ok: false, error: String(err) });
   }
 });
+
 
 
 export { router }; // <— named export (what index.js imports)
